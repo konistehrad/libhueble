@@ -1,4 +1,6 @@
-from bleak import BleakClient
+import math
+import asyncio
+from bleak import BleakClient, BleakScanner
 from rgbxy import Converter, GamutC, get_light_gamut
 from struct import pack, unpack
 
@@ -12,10 +14,39 @@ CHAR_BRIGHTNESS = '932c32bd-0003-47a2-835a-a8d455b859dd'
 CHAR_TEMPERATURE = '932c32bd-0004-47a2-835a-a8d455b859dd'
 # color (CIE XY coordinates converted to two 16-bit little-endian integers)
 CHAR_COLOR = '932c32bd-0005-47a2-835a-a8d455b859dd'
+# all of the above characteristics
+ALL_CHARS = [CHAR_MODEL, CHAR_POWER, CHAR_BRIGHTNESS, CHAR_TEMPERATURE, CHAR_COLOR]
 
 
 class Lamp(object):
     """A wrapper for the Philips Hue BLE protocol"""
+
+    @classmethod
+    async def discover(cls, timeout: float = 5.0):
+        discovered_lamps = set()
+        detected_device_addresses = set()
+        detection_callback_tasks = set()
+
+        async def detection_callback_async(device, _):
+            async with BleakClient(device.address, timeout=math.inf) as client:
+                services = await client.get_services()
+                characteristic_uuids = [characteristic.uuid for service in services for characteristic in
+                                        service.characteristics]
+                if set(ALL_CHARS) <= set(characteristic_uuids):
+                    discovered_lamps.add(device)
+
+        def detection_callback(device, _):
+            if device.address not in detected_device_addresses:
+                detected_device_addresses.add(device.address)
+                task = asyncio.create_task(detection_callback_async(device, _))
+                detection_callback_tasks.add(task)
+
+        await BleakScanner.discover(timeout, detection_callback=detection_callback)
+
+        for detection_callback_task in detection_callback_tasks:
+            detection_callback_task.cancel()
+
+        return [cls(lamp.address, lamp.name) for lamp in discovered_lamps]
 
     def __init__(self, address, name: str = None):
         self.converter = None
