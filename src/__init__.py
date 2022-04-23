@@ -13,10 +13,12 @@ CHAR_TEMPERATURE = '932c32bd-0004-47a2-835a-a8d455b859dd'
 # color (CIE XY coordinates converted to two 16-bit little-endian integers)
 CHAR_COLOR = '932c32bd-0005-47a2-835a-a8d455b859dd'
 
+
 class Lamp(object):
     """A wrapper for the Philips Hue BLE protocol"""
 
     def __init__(self, address):
+        self.converter = None
         self.address = address
         self.client = None
 
