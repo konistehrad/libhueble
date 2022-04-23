@@ -17,9 +17,10 @@ CHAR_COLOR = '932c32bd-0005-47a2-835a-a8d455b859dd'
 class Lamp(object):
     """A wrapper for the Philips Hue BLE protocol"""
 
-    def __init__(self, address):
+    def __init__(self, address, name: str = None):
         self.converter = None
         self.address = address
+        self.name = name
         self.client = None
 
     @property
@@ -95,3 +96,9 @@ class Lamp(object):
         """Sets the RGB color from floats between 0.0 and 1.0"""
         x, y = self.converter.rgb_to_xy(r, g, b)
         await self.set_color_xy(x, y)
+
+    def __repr__(self):
+        if self.name is None:
+            return self.address
+        else:
+            return f'{self.name} ({self.address})'
