@@ -4,6 +4,7 @@ from bleak import BleakClient, BleakScanner
 from bleak.backends.device import BLEDevice
 from rgbxy import Converter, GamutC, get_light_gamut
 from struct import pack, unpack
+import logging
 
 # model number as an ASCII string
 CHAR_MODEL = '00002a24-0000-1000-8000-00805f9b34fb'
@@ -54,6 +55,10 @@ class Lamp(object):
         self.address = address
         self.name = name
         self.client = None
+        self.__logger = logging.getLogger('io.github.alex1s.libhueble')
+
+        self.__model = None
+        self.__power = None
 
     @property
     def is_connected(self):
@@ -64,29 +69,48 @@ class Lamp(object):
         self.client = BleakClient(self.address)
         await self.client.connect()
 
-        model = await self.get_model()
+        # init model
+        model_bytes = await self.client.read_gatt_char(CHAR_MODEL)
+        model_str = model_bytes.decode('ascii')
+        self.__model = model_str
+
         try:
-            self.converter = Converter(get_light_gamut(model))
+            self.converter = Converter(get_light_gamut(self.model))
         except ValueError:
             self.converter = Converter(GamutC)
+
+        # init power
+        def power_callback(sender: int, data: bytearray):
+            self.__logger.debug(f'Power notification: sender={sender}, data={data}')
+            assert data in [b'\x00', b'\x01']
+            if data == b'\x01':
+                self.__power = True
+            else:
+                self.__power = False
+
+        await self.client.start_notify(CHAR_POWER, power_callback)
+        pwr = await self.client.read_gatt_char(CHAR_POWER)
+        power_callback(-1, pwr)
 
     async def disconnect(self):
         await self.client.disconnect()
         self.client = None
 
-    async def get_model(self):
-        """Returns the model string"""
-        model = await self.client.read_gatt_char(CHAR_MODEL)
-        return model.decode('ascii')
+    @property
+    def model(self) -> str:
+        """The model string"""
+        return self.__model
 
-    async def get_power(self):
-        """Gets the current power state"""
-        power = await self.client.read_gatt_char(CHAR_POWER)
-        return bool(power[0])
+    @property
+    def power(self) -> bool:
+        return self.__power
 
-    async def set_power(self, on):
-        """Sets the power state"""
-        await self.client.write_gatt_char(CHAR_POWER, bytes([1 if on else 0]), response=True)
+    @power.setter
+    def power(self, value: bool):
+        asyncio.create_task(self.client.write_gatt_char(CHAR_POWER, bytes([1 if value else 0])))
+        # we do not have to update __power as this will be done automatically by notify service
+        # we also do not want to update __power manually as we do not know if write will be successful
+        # same is true for all the other properties
 
     async def get_brightness(self):
         """Gets the current brightness as a float between 0.0 and 1.0"""
