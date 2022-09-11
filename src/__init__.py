@@ -1,6 +1,7 @@
 import math
 import asyncio
 from bleak import BleakClient, BleakScanner
+from bleak.backends.device import BLEDevice
 from rgbxy import Converter, GamutC, get_light_gamut
 from struct import pack, unpack
 
@@ -27,7 +28,7 @@ class Lamp(object):
         detected_device_addresses = set()
         detection_callback_tasks = set()
 
-        async def detection_callback_async(device, _):
+        async def detection_callback_async(device: BLEDevice, _):
             async with BleakClient(device.address, timeout=math.inf) as client:
                 services = await client.get_services()
                 characteristic_uuids = [characteristic.uuid for service in services for characteristic in
@@ -35,7 +36,7 @@ class Lamp(object):
                 if set(ALL_CHARS) <= set(characteristic_uuids):
                     discovered_lamps.add(device)
 
-        def detection_callback(device, _):
+        def detection_callback(device: BLEDevice, _):
             if device.address not in detected_device_addresses:
                 detected_device_addresses.add(device.address)
                 task = asyncio.create_task(detection_callback_async(device, _))
