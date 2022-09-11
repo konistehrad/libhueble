@@ -48,17 +48,23 @@ class Lamp(object):
         for detection_callback_task in detection_callback_tasks:
             detection_callback_task.cancel()
 
-        return [cls(lamp.address, lamp.name) for lamp in discovered_lamps]
+        return [cls(lamp, lamp.name) for lamp in discovered_lamps]
 
-    def __init__(self, address, name: str = None):
+    def __init__(self, address_or_ble_device: str | BLEDevice, name: str = None):
         self.converter = None
-        self.address = address
+        if isinstance(address_or_ble_device, BLEDevice):
+            self.__ble_device = address_or_ble_device
+            self.address = address_or_ble_device.address
+        else:
+            self.__ble_device = None
+            self.address = address_or_ble_device
         self.name = name
         self.client = None
         self.__logger = logging.getLogger('io.github.alex1s.libhueble')
 
         self.__model = None
         self.__power = None
+        self.__brightness = None
 
     @property
     def is_connected(self):
@@ -66,7 +72,10 @@ class Lamp(object):
 
     async def connect(self):
         # reinitialize BleakClient for every connection to avoid errors
-        self.client = BleakClient(self.address)
+        if self.__ble_device is not None:
+            self.client = BleakClient(self.__ble_device)
+        else:
+            self.client = BleakClient(self.address)
         await self.client.connect()
 
         # init model
@@ -92,6 +101,16 @@ class Lamp(object):
         pwr = await self.client.read_gatt_char(CHAR_POWER)
         power_callback(-1, pwr)
 
+        # init brightness
+        def brightness_callback(sender: int, data: bytearray):
+            self.__logger.debug(f'Brightness notification: sender={sender}, data={data}')
+            assert len(data) == 1
+            self.__brightness = data[0] / 255
+
+        await self.client.start_notify(CHAR_BRIGHTNESS, brightness_callback)
+        bright = await self.client.read_gatt_char(CHAR_BRIGHTNESS)
+        brightness_callback(-1, bright)
+
     async def disconnect(self):
         await self.client.disconnect()
         self.client = None
@@ -106,12 +125,19 @@ class Lamp(object):
         return self.__power
 
     @power.setter
-    def power(self, value: bool):
+    def power(self, value: bool) -> None:
         asyncio.create_task(self.client.write_gatt_char(CHAR_POWER, bytes([1 if value else 0])))
         # we do not have to update __power as this will be done automatically by notify service
         # we also do not want to update __power manually as we do not know if write will be successful
         # same is true for all the other properties
 
+    @property
+    def brightness(self) -> float:
+        return self.__brightness
+
+    @brightness.setter
+    def brightness(self, value: float) -> None:
+        asyncio.create_task(self.client.write_gatt_char(CHAR_BRIGHTNESS, bytes([max(min(int(round(self.__brightness * 255)), 254), 1)])))
     async def get_brightness(self):
         """Gets the current brightness as a float between 0.0 and 1.0"""
         brightness = await self.client.read_gatt_char(CHAR_BRIGHTNESS)
