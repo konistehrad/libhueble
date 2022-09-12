@@ -58,7 +58,8 @@ class Lamp(object):
         else:
             self.__ble_device = None
             self.address = address_or_ble_device
-        self.name = name
+        if name is None and isinstance(address_or_ble_device, BLEDevice):
+            self.name = address_or_ble_device.name
         self.client = None
         self.__logger = logging.getLogger('io.github.alex1s.libhueble')
 
