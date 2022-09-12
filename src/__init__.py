@@ -82,6 +82,7 @@ class Lamp(object):
         model_bytes = await self.client.read_gatt_char(CHAR_MODEL)
         model_str = model_bytes.decode('ascii')
         self.__model = model_str
+        self.__logger.debug(f'Model initialized to "{self.__model}"')
 
         try:
             self.converter = Converter(get_light_gamut(self.model))
