@@ -50,7 +50,8 @@ class Lamp(object):
 
         return [cls(lamp, lamp.name) for lamp in discovered_lamps]
 
-    def __init__(self, address_or_ble_device: str | BLEDevice, name: str = None):
+    def __init__(self, address_or_ble_device: str | BLEDevice, name: str = None, create_task=asyncio.create_task):
+        self.__create_task = create_task
         self.converter = None
         if isinstance(address_or_ble_device, BLEDevice):
             self.__ble_device = address_or_ble_device
@@ -128,7 +129,7 @@ class Lamp(object):
 
     @power.setter
     def power(self, value: bool) -> None:
-        asyncio.create_task(self.client.write_gatt_char(CHAR_POWER, bytes([1 if value else 0])))
+        self.__create_task(self.client.write_gatt_char(CHAR_POWER, bytes([1 if value else 0])))
         # we do not have to update __power as this will be done automatically by notify service
         # we also do not want to update __power manually as we do not know if write will be successful
         # same is true for all the other properties
@@ -139,7 +140,7 @@ class Lamp(object):
 
     @brightness.setter
     def brightness(self, value: float) -> None:
-        asyncio.create_task(self.client.write_gatt_char(CHAR_BRIGHTNESS, bytes([max(min(int(round(self.__brightness * 255)), 254), 1)])))
+        self.__create_task(self.client.write_gatt_char(CHAR_BRIGHTNESS, bytes([max(min(int(round(self.__brightness * 255)), 254), 1)])))
     async def get_brightness(self):
         """Gets the current brightness as a float between 0.0 and 1.0"""
         brightness = await self.client.read_gatt_char(CHAR_BRIGHTNESS)
