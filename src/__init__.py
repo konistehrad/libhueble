@@ -24,7 +24,7 @@ class Lamp(object):
     """A wrapper for the Philips Hue BLE protocol"""
 
     @classmethod
-    async def discover(cls, timeout: float = 5.0):
+    async def discover(cls, timeout: float = 5.0, create_task=asyncio.create_task):
         discovered_lamps = set()
         detected_device_addresses = set()
         detection_callback_tasks = set()
@@ -40,7 +40,7 @@ class Lamp(object):
         def detection_callback(device: BLEDevice, _):
             if device.address not in detected_device_addresses:
                 detected_device_addresses.add(device.address)
-                task = asyncio.create_task(detection_callback_async(device, _))
+                task = create_task(detection_callback_async(device, _))
                 detection_callback_tasks.add(task)
 
         await BleakScanner.discover(timeout, detection_callback=detection_callback)
