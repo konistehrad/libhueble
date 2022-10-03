@@ -139,11 +139,13 @@ class Lamp(object):
         hue_value = round(value * 0xFE)
         self.__logger.debug(f'Rounding brightness {value} to a hue value of {hue_value}.')
         if hue_value == 0:
-            self.__logger.warning(f'You are trying to set the brightness to zero ({value}). This is not possible. Turn the light off instead.')
+            await self.set_power(False)
             return
         if hue_value != self.__brightness:
+            # yes, we can set the brightness while the lamp is off
             await self.client.write_gatt_char(CHAR_BRIGHTNESS, bytes([hue_value]), True)
             self.__brightness = hue_value
+        await self.set_power(True)
 
     async def get_temperature(self):
         """Gets the current color temperature as a float between 0.0 and 1.0"""
