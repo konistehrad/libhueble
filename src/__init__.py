@@ -123,16 +123,11 @@ class Lamp(object):
         """The model string"""
         return self.__model
 
-    @property
-    def power(self) -> bool:
-        return self.__power
-
-    @power.setter
-    def power(self, value: bool) -> None:
-        self.__create_task(self.client.write_gatt_char(CHAR_POWER, bytes([1 if value else 0])))
-        # we do not have to update __power as this will be done automatically by notify service
-        # we also do not want to update __power manually as we do not know if write will be successful
-        # same is true for all the other properties
+    async def power(self, on: bool = None) -> bool:
+        if on is None or on == self.__power:
+            return self.__power
+        self.client.write_gatt_char(CHAR_POWER,  bytes([1 if on else 0]), response=True)
+        return on
 
     @property
     def brightness(self) -> float:
