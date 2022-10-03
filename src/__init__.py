@@ -126,7 +126,7 @@ class Lamp(object):
     async def power(self, on: bool = None) -> bool:
         if on is None or on == self.__power:
             return self.__power
-        self.client.write_gatt_char(CHAR_POWER,  bytes([1 if on else 0]), response=True)
+        await self.client.write_gatt_char(CHAR_POWER,  bytes([1 if on else 0]), response=True)
         self.__power = on
         return on
 
