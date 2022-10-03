@@ -108,7 +108,7 @@ class Lamp(object):
         def brightness_callback(sender: int, data: bytearray):
             self.__logger.debug(f'Brightness notification: sender={sender}, data={data}')
             assert len(data) == 1
-            self.__brightness = data[0] / 255
+            self.__brightness = data[0]
 
         await self.client.start_notify(CHAR_BRIGHTNESS, brightness_callback)
         bright = await self.client.read_gatt_char(CHAR_BRIGHTNESS)
@@ -132,21 +132,18 @@ class Lamp(object):
         await self.client.write_gatt_char(CHAR_POWER,  bytes([1 if on else 0]), response=True)
         self.__power = on
 
-    @property
-    def brightness(self) -> float:
-        return self.__brightness
+    def get_brightness(self) -> float:
+        return self.__brightness / 0xFE
 
-    @brightness.setter
-    def brightness(self, value: float) -> None:
-        self.__create_task(self.client.write_gatt_char(CHAR_BRIGHTNESS, bytes([max(min(int(round(self.__brightness * 255)), 254), 1)])))
-    async def get_brightness(self):
-        """Gets the current brightness as a float between 0.0 and 1.0"""
-        brightness = await self.client.read_gatt_char(CHAR_BRIGHTNESS)
-        return brightness[0] / 255
-
-    async def set_brightness(self, brightness):
-        """Sets the brightness from a float between 0.0 and 1.0"""
-        await self.client.write_gatt_char(CHAR_BRIGHTNESS, bytes([max(min(int(round(brightness * 255)), 254), 1)]), response=True)
+    async def set_brightness(self, value: float) -> None:
+        hue_value = round(value * 0xFE)
+        self.__logger.debug(f'Rounding brightness {value} to a hue value of {hue_value}.')
+        if hue_value == 0:
+            self.__logger.warning(f'You are trying to set the brightness to zero ({value}). This is not possible. Turn the light off instead.')
+            return
+        if hue_value != self.__brightness:
+            await self.client.write_gatt_char(CHAR_BRIGHTNESS, bytes([hue_value]), True)
+            self.__brightness = hue_value
 
     async def get_temperature(self):
         """Gets the current color temperature as a float between 0.0 and 1.0"""
