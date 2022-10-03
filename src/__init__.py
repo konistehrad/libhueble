@@ -123,12 +123,12 @@ class Lamp(object):
         """The model string"""
         return self.__model
 
-    async def power(self, on: bool = None) -> bool:
-        if on is None or on == self.__power:
-            return self.__power
+    def get_power(self):
+        return self.__power
+
+    async def set_power(self, on: bool) -> None:
         await self.client.write_gatt_char(CHAR_POWER,  bytes([1 if on else 0]), response=True)
         self.__power = on
-        return on
 
     @property
     def brightness(self) -> float:
