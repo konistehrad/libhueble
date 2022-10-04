@@ -67,10 +67,11 @@ class Lamp(object):
         self.__model = None
         self.__power = None
         self.__brightness = None
+        self.__color = None
 
     @property
     def is_connected(self):
-        return self.client and self.client.is_connected
+        return self.client and self.client.is_connected and self.__model is not None and self.__power is not None and self.__brightness is not None and self.__color is not None
 
     async def connect(self):
         # reinitialize BleakClient for every connection to avoid errors
@@ -114,6 +115,16 @@ class Lamp(object):
         bright = await self.client.read_gatt_char(CHAR_BRIGHTNESS)
         brightness_callback(-1, bright)
 
+        # init color
+        def color_callback(sender: int, data: bytearray):
+            self.__logger.debug(f'Brightness notification: sender={sender}, data={data}')
+            assert len(data) == 4
+            self.__color = unpack('<HH', data)
+
+        await self.client.start_notify(CHAR_COLOR, color_callback)
+        color = await self.client.read_gatt_char(CHAR_BRIGHTNESS)
+        color_callback(-1, color)
+
     async def disconnect(self):
         await self.client.disconnect()
         self.client = None
@@ -147,6 +158,17 @@ class Lamp(object):
             self.__brightness = hue_value
         await self.set_power(True)
 
+    def get_color(self):
+        return round(self.__color * 0xFFFF), round(self.__color * 0xFFFF)
+
+    async def set_color(self, color):
+        x, y = round(color[0] * 0xFFFF), round(color[1] * 0xFFFF)
+        if (x, y) == self.__color:
+            return
+        data = pack('<HH', x, y)
+        await self.client.write_gatt_char(CHAR_COLOR, data, True)
+        self.__color = x, y
+
     async def get_temperature(self):
         """Gets the current color temperature as a float between 0.0 and 1.0"""
         temperature = await self.client.read_gatt_char(CHAR_TEMPERATURE)
@@ -157,17 +179,6 @@ class Lamp(object):
         temperature = max(temperature, 0)
         temperature = min(int(round(temperature * 301)) + 153, 454)
         await self.client.write_gatt_char(CHAR_TEMPERATURE, bytes([temperature & 0xFF, temperature >> 8]), response=True)
-
-    async def get_color_xy(self):
-        """Gets the current XY color coordinates as floats between 0.0 and 1.0"""
-        buf = await self.client.read_gatt_char(CHAR_COLOR)
-        x, y = unpack('<HH', buf)
-        return x / 0xFFFF, y / 0xFFFF
-
-    async def set_color_xy(self, x, y):
-        """Sets the XY color coordinates from floats between 0.0 and 1.0"""
-        buf = pack('<HH', int(x * 0xFFFF), int(y * 0xFFFF))
-        await self.client.write_gatt_char(CHAR_COLOR, buf, response=True)
 
     async def get_color_rgb(self):
         """Gets the RGB color as floats between 0.0 and 1.0"""
