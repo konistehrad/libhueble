@@ -159,7 +159,7 @@ class Lamp(object):
         await self.set_power(True)
 
     def get_color(self):
-        return round(self.__color * 0xFFFF), round(self.__color * 0xFFFF)
+        return round(self.__color[0] * 0xFFFF), round(self.__color[1] * 0xFFFF)
 
     async def set_color(self, color):
         x, y = round(color[0] * 0xFFFF), round(color[1] * 0xFFFF)
