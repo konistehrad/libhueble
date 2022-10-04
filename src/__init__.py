@@ -117,12 +117,12 @@ class Lamp(object):
 
         # init color
         def color_callback(sender: int, data: bytearray):
-            self.__logger.debug(f'Brightness notification: sender={sender}, data={data}')
+            self.__logger.debug(f'Color notification: sender={sender}, data={data}')
             assert len(data) == 4
             self.__color = unpack('<HH', data)
 
         await self.client.start_notify(CHAR_COLOR, color_callback)
-        color = await self.client.read_gatt_char(CHAR_BRIGHTNESS)
+        color = await self.client.read_gatt_char(CHAR_COLOR)
         color_callback(-1, color)
 
     async def disconnect(self):
