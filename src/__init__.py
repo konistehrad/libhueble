@@ -1,3 +1,4 @@
+from typing import Union
 import math
 import asyncio
 from bleak import BleakClient, BleakScanner
@@ -50,7 +51,7 @@ class Lamp(object):
 
         return [cls(lamp, lamp.name) for lamp in discovered_lamps]
 
-    def __init__(self, address_or_ble_device: str | BLEDevice, name: str = None, create_task=asyncio.create_task):
+    def __init__(self, address_or_ble_device: Union[str, BLEDevice], name: str = None, create_task=asyncio.create_task):
         self.__create_task = create_task
         self.converter = None
         if isinstance(address_or_ble_device, BLEDevice):
